@@ -244,3 +244,73 @@ main {
 .city-modal.is-open .city-modal__image {
   transform: scale(1);
 }
+
+@media (max-width: 768px) {
+  /* Уменьшаем огромные отступы по бокам и сверху */
+  .rules-section, 
+  .game-section {
+    padding: 0 16px;
+    margin-top: 40px;
+  }
+
+  /* Адаптируем размеры заголовков и текстов */
+  .rules-section > h2, 
+  .game-section > h2 {
+    font-size: 26px;
+  }
+
+  .rules-section > p {
+    font-size: 16px;
+    line-height: 22px;
+    margin-bottom: 15px;
+  }
+
+  /* Убираем жесткую ширину 500px, чтобы блок не вылезал за экран */
+  .important {
+    width: 100%;
+    box-sizing: border-box; /* Чтобы padding не раздувал ширину */
+    font-size: 16px;
+    padding: 15px;
+  }
+
+  /* Инпуты и кнопку делаем удобными для тача (в столбик, если не влезают) */
+  .city-input {
+    flex-direction: column;
+    padding: 15px;
+    gap: 12px;
+  }
+
+  #city-name, 
+  #submit-button {
+    width: 100%;
+    height: auto;
+    padding: 12px; /* Увеличиваем область клика */
+    box-sizing: border-box;
+  }
+
+  /* Управленческие элементы (кнопки/инфо) переводим в колонку */
+  .controls {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Секция с запрещенными буквами */
+  .forbidden-letters {
+    padding: 15px;
+    flex-wrap: wrap; /* Чтобы буквы переносились на новую строку, если их много */
+  }
+
+  .letter {
+    font-size: 18px;
+    padding: 8px 12px;
+  }
+
+  /* Немного уменьшаем карточки городов для экономии места */
+  .city {
+    min-height: 100px;
+  }
+
+  .city__name {
+    font-size: 22px;
+  }
+}
