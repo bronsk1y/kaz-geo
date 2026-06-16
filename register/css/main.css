@@ -73,3 +73,33 @@ main {
   margin: 0;
   color: #2e9aff;
 }
+
+@media (max-width: 768px) {
+  .login-section {
+    margin-top: 40px; /* Уменьшаем гигантский отступ сверху */
+    padding: 0 16px; /* Добавляем безопасную зону по бокам */
+  }
+
+  .login-section > h1 {
+    font-size: 32px; /* Уменьшаем размер заголовка до мобильного формата */
+    margin-bottom: 20px;
+  }
+
+  .fields {
+    gap: 15px; /* Чуть плотнее собираем поля формы */
+    padding-bottom: 20px;
+  }
+
+  .fields > button {
+    font-size: 18px; /* Кнопку делаем чуть компактнее */
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .already-have-an-account {
+    flex-direction: column; /* На очень узких экранах текст и ссылка встанут друг под друга */
+    align-items: center;
+    gap: 5px;
+    font-size: 15px;
+  }
+}
