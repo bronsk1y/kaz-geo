@@ -10,6 +10,7 @@ let currentRound = null;
 let lastCityLastLetter = null;
 let lastCityUserId = null;
 let knownCityIds = new Set();
+let isPolling = false; // Предохранитель от параллельных запросов и дублирования
 
 const FORBIDDEN_WINDOW_SIZE = 5;
 let forbiddenLettersWindow = [];
@@ -38,7 +39,7 @@ let penaltyTimerInterval = null;
     .city__letter-last {
       color: lightgreen;
       text-decoration: underline solid 2px;
-        text-underline-offset: 2px;
+      text-underline-offset: 2px;
     }
     .city__letter-cross {
       position: relative;
@@ -449,29 +450,46 @@ async function initGameState() {
 async function pollForNewCities() {
   if (!currentRound) return;
 
+  // Если прошлый запрос пуллинга ещё выполняется, игнорируем новый такт таймера
+  if (isPolling) return;
+
   if (new Date(currentRound.ends_at) <= new Date()) {
     await initGameState();
     return;
   }
 
-  const cities = await loadRoundCities(currentRound.id);
-  const newCities = cities.filter((c) => !knownCityIds.has(c.id));
+  try {
+    isPolling = true;
 
-  if (newCities.length === 0) return;
+    const cities = await loadRoundCities(currentRound.id);
+    const newCities = cities.filter((c) => !knownCityIds.has(c.id));
 
-  for (const cityRow of newCities) {
-    knownCityIds.add(cityRow.id);
-    await renderCityCard(cityRow);
-  }
+    if (newCities.length === 0) return;
 
-  lastCityLastLetter = cities[cities.length - 1].last_letter;
-  lastCityUserId = cities[cities.length - 1].user_id;
+    // Шаг 1: Моментально регистрируем все новые ID городов в Set,
+    // чтобы повторные вызовы pollForNewCities не посчитали их новыми.
+    for (const cityRow of newCities) {
+      knownCityIds.add(cityRow.id);
+    }
 
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session) {
-    const myCities = cities.filter((c) => c.user_id === session.user.id);
-    forbiddenLettersWindow = myCities.slice(-FORBIDDEN_WINDOW_SIZE).map((c) => c.last_letter);
-    renderForbiddenLetters();
+    // Шаг 2: Асинхронно рендерим карточки (где внутри запрашивается Wikipedia API)
+    for (const cityRow of newCities) {
+      await renderCityCard(cityRow);
+    }
+
+    lastCityLastLetter = cities[cities.length - 1].last_letter;
+    lastCityUserId = cities[cities.length - 1].user_id;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+      const myCities = cities.filter((c) => c.user_id === session.user.id);
+      forbiddenLettersWindow = myCities.slice(-FORBIDDEN_WINDOW_SIZE).map((c) => c.last_letter);
+      renderForbiddenLetters();
+    }
+  } catch (err) {
+    console.error('Ошибка во время пуллинга городов:', err);
+  } finally {
+    isPolling = false;
   }
 }
 
