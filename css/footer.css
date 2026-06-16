@@ -1,0 +1,28 @@
+footer {
+  padding-top: 30px;
+  padding-bottom: 30px;
+  display: flex;
+  padding-left: 40px;
+  padding-right: 40px;
+  flex-direction: column;
+  border-top: 2px solid #424242;
+  gap: 20px;
+  background: #141413;
+  flex-shrink: 0;
+  margin-top: 60px;
+}
+
+.description {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.description > h3 {
+  margin: 0;
+  color: white;
+}
+
+.description > span {
+  color: #87867f;
+}

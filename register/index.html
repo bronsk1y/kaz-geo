@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../css/body.css" />
+    <link rel="stylesheet" href="../css/header.css" />
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="../css/footer.css" />
+    <link rel="stylesheet" href="../css/toast.css" />
+    <link
+      rel="preload"
+      href="../fonts/graphik-regular.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin=""
+    />
+    <title>Kaz Geo - Регистрация</title>
+  </head>
+  <body>
+    <header style="margin-top: 23px">
+      <div class="logo">
+        <img
+          src="../images/logo.png"
+          width="30"
+          height="30"
+          alt="картинка глобуса"
+        />
+        <a href="../index.html"><span>Kaz GEO</span></a>
+      </div>
+    </header>
+    <main>
+      <div class="login-section">
+        <h1>Зарегистрируйтесь</h1>
+        <div class="fields">
+          <div class="field">
+            <span>Почта</span>
+            <input placeholder="Введите почту" type="email" id="email-field" />
+          </div>
+          <div class="field">
+            <span>Пароль</span>
+            <input
+              placeholder="Введите пароль"
+              type="password"
+              id="password-field"
+            />
+          </div>
+          <button id="register-button">Зарегистрироваться</button>
+        </div>
+        <div class="alraedy-have-an-account">
+          <span>Уже есть аккаунт?</span>
+          <a href="../login/index.html">Войти</a>
+        </div>
+      </div>
+    </main>
+    <footer>
+      <div class="description">
+        <h3>Kaz GEO</h3>
+        <span>2026 Казанцев Артем®</span>
+      </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../scripts/supabase-init.js"></script>
+    <script src="../scripts/toast.js"></script>
+    <script src="../scripts/register.js"></script>
+  </body>
+</html>

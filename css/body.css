@@ -1,0 +1,23 @@
+@font-face {
+  font-family: "Graphik";
+  src: url(../fonts/graphik-regular.woff2) format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: fallback;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: "Graphik";
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1 0 auto;
+}

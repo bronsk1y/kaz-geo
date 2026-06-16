@@ -1,0 +1,129 @@
+header {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 0 100px;
+}
+
+.logo {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+}
+
+.logo > img,
+.logo > a > span {
+  user-select: none;
+}
+
+.logo > a {
+  text-decoration: none;
+  color: black;
+}
+
+.logo > a > span {
+  font-size: 24px;
+}
+
+.links {
+  list-style: none;
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+}
+
+.link {
+  text-decoration: none;
+  color: #b0aea5;
+  font-size: 20px;
+}
+
+#auth-link-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+#profile-picture {
+  display: none;
+}
+
+.auth-dropdown {
+  position: relative;
+}
+
+.profile-dropdown {
+  display: none;
+  position: absolute;
+  top: 110%;
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid #e5e3dc;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  margin-top: 10px;
+}
+
+.profile-dropdown.is-open {
+  display: block;
+}
+
+.profile-dropdown__username-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e5e3dc;
+}
+
+.profile-dropdown__username-input {
+  flex: 1;
+  border: none;
+  background: none;
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 24px;
+  padding: 4px 0;
+  outline: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.profile-dropdown__username-input:focus {
+  border-bottom-color: #b0aea5;
+}
+
+.profile-dropdown__save-name {
+  background: none;
+  border: none;
+  color: #2e7d32;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.profile-dropdown__save-name:hover {
+  background: rgba(46, 125, 50, 0.1);
+}
+
+.profile-dropdown__save-name:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.profile-dropdown__logout {
+  border: none;
+  color: red;
+  background: none;
+  font-size: 20px;
+}
