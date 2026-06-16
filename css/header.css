@@ -127,3 +127,55 @@ header {
   background: none;
   font-size: 20px;
 }
+
+@media (max-width: 768px) {
+  header {
+    margin-top: 15px;
+    flex-direction: column; /* Выстраиваем логотип и ссылки друг под друга */
+    align-items: center;
+    gap: 15px; /* Задаем отступ между лого и навигацией */
+    padding: 0 16px; /* Уменьшаем боковые отступы со 100px до 16px */
+  }
+
+  .logo > a > span {
+    font-size: 22px; /* Чуть уменьшаем шрифт логотипа */
+  }
+
+  .links {
+    padding: 0;
+    margin: 0;
+    gap: 20px; /* Делаем расстояние между ссылками чуть меньше, чтобы всё влезло */
+    justify-content: center;
+    width: 100%;
+    flex-wrap: wrap; /* Если ссылок много, они красиво перенесутся на вторую строку */
+  }
+
+  .link {
+    font-size: 16px; /* Оптимальный размер шрифта для телефона */
+  }
+
+  #auth-link-item {
+    font-size: 16px;
+  }
+
+  /* Позиционирование выпадающего окна профиля */
+  .profile-dropdown {
+    top: 120%;
+    right: 50%;
+    transform: translateX(
+      50%
+    ); /* Центрируем дропдаун относительно кнопки "Профиль" */
+    min-width: 260px; /* Немного расширяем для удобства тача */
+  }
+
+  .profile-dropdown__username-input {
+    font-size: 18px; /* Уменьшаем гигантский шрифт ввода имени */
+  }
+
+  .profile-dropdown__logout {
+    font-size: 16px; /* Делаем кнопку выхода аккуратнее */
+    padding: 8px 0;
+    width: 100%;
+    text-align: left;
+  }
+}
