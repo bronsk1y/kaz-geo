@@ -43,6 +43,10 @@ if (saveUsernameButton && dropdownUsernameInput) {
     event.stopPropagation(); // не закрывать меню кликом по кнопке сохранения
 
     const newUsername = dropdownUsernameInput.value.trim();
+    const authLink = document.querySelector('#auth-link');
+    
+    // Запоминаем старое имя на случай, если сервер вернет ошибку
+    const oldUsername = authLink ? authLink.textContent : '';
 
     if (!newUsername) {
       showToast('Имя не может быть пустым.', 'error');
@@ -54,22 +58,34 @@ if (saveUsernameButton && dropdownUsernameInput) {
       return;
     }
 
-    saveUsernameButton.disabled = true;
+    // === ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ UI ===
+    // Меняем имя в шапке мгновенно, до запроса к БД
+    if (authLink) {
+      authLink.textContent = newUsername;
+    }
 
+    // Даем визуальный отклик на кнопке
+    saveUsernameButton.disabled = true;
+    const originalButtonText = saveUsernameButton.textContent;
+    saveUsernameButton.textContent = 'Сохраняем...'; 
+
+    // Отправляем запрос на сервер
     const { data, error } = await supabaseClient.auth.updateUser({
       data: { username: newUsername },
     });
 
+    // Возвращаем кнопку в исходное состояние
     saveUsernameButton.disabled = false;
+    saveUsernameButton.textContent = originalButtonText;
 
     if (error) {
+      // Если произошла ошибка сети или базы данных — откатываем имя обратно
+      if (authLink) {
+        authLink.textContent = oldUsername;
+      }
       showToast('Не удалось сохранить имя: ' + error.message, 'error');
       return;
     }
-
-    // обновляем отображаемое имя в кнопке хедера
-    const authLink = document.querySelector('#auth-link');
-    if (authLink) authLink.textContent = newUsername;
 
     showToast('Имя успешно обновлено!', 'success');
   });
