@@ -1,5 +1,5 @@
 const GEONAMES_USERNAME = 'Wujab';
-const POLLING_INTERVAL_MS = 20000;
+const POLLING_INTERVAL_MS = 10000;
 
 const cityInput = document.querySelector('#city-name');
 const submitButton = document.querySelector('#submit-button');
