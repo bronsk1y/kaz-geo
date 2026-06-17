@@ -131,49 +131,48 @@ header {
 @media (max-width: 768px) {
   header {
     margin-top: 15px;
-    flex-direction: column; /* Выстраиваем логотип и ссылки друг под друга */
+    flex-direction: column; 
     align-items: center;
-    gap: 15px; /* Задаем отступ между лого и навигацией */
-    padding: 0 16px; /* Уменьшаем боковые отступы со 100px до 16px */
+    gap: 15px; 
+    padding: 0 16px; 
   }
 
   .logo > a > span {
-    font-size: 22px; /* Чуть уменьшаем шрифт логотипа */
+    font-size: 22px;
   }
 
   .links {
     padding: 0;
     margin: 0;
-    gap: 20px; /* Делаем расстояние между ссылками чуть меньше, чтобы всё влезло */
+    gap: 20px; 
     justify-content: center;
     width: 100%;
-    flex-wrap: wrap; /* Если ссылок много, они красиво перенесутся на вторую строку */
+    flex-wrap: wrap; 
   }
 
   .link {
-    font-size: 16px; /* Оптимальный размер шрифта для телефона */
+    font-size: 16px; 
   }
 
   #auth-link-item {
     font-size: 16px;
   }
 
-  /* Позиционирование выпадающего окна профиля */
   .profile-dropdown {
     top: 120%;
     right: 50%;
     transform: translateX(
       50%
-    ); /* Центрируем дропдаун относительно кнопки "Профиль" */
-    min-width: 260px; /* Немного расширяем для удобства тача */
+    ); 
+    min-width: 260px; 
   }
 
   .profile-dropdown__username-input {
-    font-size: 18px; /* Уменьшаем гигантский шрифт ввода имени */
+    font-size: 18px; 
   }
 
   .profile-dropdown__logout {
-    font-size: 16px; /* Делаем кнопку выхода аккуратнее */
+    font-size: 16px; 
     padding: 8px 0;
     width: 100%;
     text-align: left;
