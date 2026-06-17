@@ -1,24 +1,32 @@
-const GEONAMES_USERNAME = 'Wujab';
-const POLLING_INTERVAL_MS = 10000;
+// ====== НАСТРОЙКИ ======
+const GEONAMES_USERNAME = 'Wujab'; 
+const POLLING_INTERVAL_MS = 20000; 
 
+// ====== DOM ЭЛЕМЕНТЫ ======
 const cityInput = document.querySelector('#city-name');
 const submitButton = document.querySelector('#submit-button');
 const calledCitiesContainer = document.querySelector('#called-cities-container');
 const forbiddenLettersEl = document.querySelector('.forbidden-letters');
 
-let currentRound = null;
-let lastCityLastLetter = null;
-let lastCityUserId = null;
-let knownCityIds = new Set();
-let isPolling = false; // Предохранитель от параллельных запросов и дублирования
+// ====== СОСТОЯНИЕ ИГРЫ (синхронизируется с базой) ======
+let currentRound = null; // { id, started_at, ends_at }
+let lastCityLastLetter = null; // буква, на которую должен начинаться следующий город (из ОБЩЕГО списка)
+let lastCityUserId = null; // user_id автора последнего названного города (для блокировки повторной отправки)
+let knownCityIds = new Set(); // id городов, уже отрисованных на странице (чтобы не дублировать при поллинге)
 
+// личное окно последних 5 букв ТЕКУЩЕГО игрока в рамках раунда
 const FORBIDDEN_WINDOW_SIZE = 5;
 let forbiddenLettersWindow = [];
 
+// сколько карточек городов одновременно показывать на странице (визуальное окно,
+// правила игры всё равно учитывают полную историю раунда из базы)
 const VISIBLE_CITIES_LIMIT = 15;
 
+// буквы, на которых игра не обрывается, а смещается на букву раньше
 const EXCLUDED_LETTERS = ['Ы', 'Ь', 'Ъ'];
 
+// альтернативные пары: если предыдущий город кончается на ключ,
+// следующий может начинаться на любую из букв в значении
 const ALTERNATIVE_LETTERS = {
   'Й': ['Й', 'И'],
   'И': ['И', 'Й'],
@@ -26,99 +34,7 @@ const ALTERNATIVE_LETTERS = {
   'Е': ['Е', 'Ё'],
 };
 
-let penaltyEndsAt = 0;
-let penaltyTimerInterval = null;
-
-(function injectCityNameStyles() {
-  const style = document.createElement('style');
-  style.textContent = `
-    .city__letter-first {
-      text-decoration: underline dotted 2px;
-      text-underline-offset: 4px;
-    }
-    .city__letter-last {
-      color: lightgreen;
-      text-decoration: underline solid 2px;
-      text-underline-offset: 2px;
-    }
-    .city__letter-cross {
-      position: relative;
-      display: inline;
-    }
-    .city__letter-cross::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background:
-        linear-gradient(
-          to bottom right,
-          transparent calc(50% - 1.5px),
-          #ef4444 calc(50% - 1.5px),
-          #ef4444 calc(50% + 1.5px),
-          transparent calc(50% + 1.5px)
-        ),
-        linear-gradient(
-          to bottom left,
-          transparent calc(50% - 1.5px),
-          #ef4444 calc(50% - 1.5px),
-          #ef4444 calc(50% + 1.5px),
-          transparent calc(50% + 1.5px)
-        );
-    }
-  `;
-  document.head.appendChild(style);
-})();
-
-function buildCityNameHTML(cityName) {
-  const chars = [...cityName];
-
-  const cyrillicPositions = [];
-  for (let i = 0; i < chars.length; i++) {
-    if (/[А-ЯЁа-яё]/.test(chars[i])) cyrillicPositions.push(i);
-  }
-
-  if (cyrillicPositions.length === 0) return cityName;
-
-  const firstOrigIdx = cyrillicPositions[0];
-  const lastOrigIdx = cyrillicPositions[cyrillicPositions.length - 1];
-
-  let effPosIdx = cyrillicPositions.length - 1;
-  while (effPosIdx > 0 && EXCLUDED_LETTERS.includes(chars[cyrillicPositions[effPosIdx]].toUpperCase())) {
-    effPosIdx--;
-  }
-  const effectiveLastOrigIdx = cyrillicPositions[effPosIdx];
-
-  const hasCross = effectiveLastOrigIdx !== lastOrigIdx;
-  const crossStart = effectiveLastOrigIdx;
-  const crossEnd = lastOrigIdx;
-
-  let html = '';
-
-  for (let i = 0; i < chars.length; i++) {
-    const ch = chars[i];
-    const isFirst = i === firstOrigIdx;
-    const isEffLast = i === effectiveLastOrigIdx;
-    const isCrossStart = hasCross && i === crossStart;
-    const isCrossEnd = hasCross && i === crossEnd;
-
-    if (isCrossStart) html += `<span class="city__letter-cross">`;
-
-    if (isFirst && isEffLast) {
-      html += `<span class="city__letter-first city__letter-last">${ch}</span>`;
-    } else if (isFirst) {
-      html += `<span class="city__letter-first">${ch}</span>`;
-    } else if (isEffLast) {
-      html += `<span class="city__letter-last">${ch}</span>`;
-    } else {
-      html += ch;
-    }
-
-    if (isCrossEnd) html += `</span>`;
-  }
-
-  return html;
-}
+// ====== УТИЛИТЫ ПРАВИЛ ИГРЫ ======
 
 function normalizeForCompare(str) {
   return str
@@ -131,15 +47,19 @@ function normalizeForCompare(str) {
 function getEffectiveLastLetter(word) {
   const letters = word.toUpperCase().replace(/[^А-ЯЁ]/g, '');
   let i = letters.length - 1;
+
   while (i > 0 && EXCLUDED_LETTERS.includes(letters[i])) {
     i--;
   }
+
   return letters[i];
 }
 
 function getAllowedStartLetters(lastLetter) {
   return ALTERNATIVE_LETTERS[lastLetter] || [lastLetter];
 }
+
+// ====== ШТРАФНЫЕ БУКВЫ (личные для игрока) ======
 
 function isLetterForbidden(letter) {
   return forbiddenLettersWindow.includes(letter);
@@ -165,41 +85,27 @@ function renderForbiddenLetters() {
     .join('');
 }
 
-function applyPenalty() {
-  const now = Date.now();
-  penaltyEndsAt = Math.max(penaltyEndsAt, now) + 60_000;
-  startPenaltyTimer();
+// ====== УТИЛИТА: FETCH С ТАЙМАУТОМ ======
+// Без таймаута на мобильной сети одно подвисшее соединение могло
+// бесконечно "висеть", из-за чего весь процесс выглядел зависшим.
+
+async function fetchWithTimeout(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
-function startPenaltyTimer() {
-  if (penaltyTimerInterval) return;
-
-  submitButton.disabled = true;
-
-  penaltyTimerInterval = setInterval(() => {
-    const remaining = Math.ceil((penaltyEndsAt - Date.now()) / 1000);
-
-    if (remaining <= 0) {
-      clearInterval(penaltyTimerInterval);
-      penaltyTimerInterval = null;
-      submitButton.disabled = false;
-      submitButton.textContent = 'Отправить';
-      return;
-    }
-
-    const minutes = Math.floor(remaining / 60);
-    const seconds = remaining % 60;
-    const label = minutes > 0
-      ? `${minutes}:${String(seconds).padStart(2, '0')}`
-      : `${seconds} сек.`;
-
-    submitButton.textContent = `Штраф: ${label}`;
-  }, 500);
-}
+// ====== GEONAMES: ПОИСК И ПРОВЕРКА ГОРОДА ======
 
 async function checkCityExists(cityName) {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://secure.geonames.org/searchJSON?name_equals=${encodeURIComponent(
         cityName
       )}&featureClass=P&maxRows=5&lang=ru&username=${GEONAMES_USERNAME}`
@@ -237,7 +143,7 @@ async function checkCityExists(cityName) {
 
 async function getCityDetails(geonameId) {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://secure.geonames.org/getJSON?geonameId=${geonameId}&lang=ru&username=${GEONAMES_USERNAME}`
     );
 
@@ -259,6 +165,8 @@ async function getCityDetails(geonameId) {
     return null;
   }
 }
+
+// ====== WIKIPEDIA: ТОЛЬКО ФОТО ======
 
 async function getCityImage(cityName) {
   try {
@@ -286,6 +194,8 @@ async function getCityImage(cityName) {
   }
 }
 
+// ====== СБОРКА ТЕКСТА МЕТАДАННЫХ ======
+
 function buildCityMeta(country, region, population) {
   const parts = [];
 
@@ -302,27 +212,34 @@ function buildCityMeta(country, region, population) {
   return parts.join(', ');
 }
 
-async function getActiveRound() {
-  const { data, error } = await supabaseClient
-    .from('rounds')
-    .select('*')
-    .eq('is_active', true)
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+// ====== РАУНДЫ ======
 
-  if (error) {
-    console.error('Ошибка загрузки раунда:', error.message);
+async function getActiveRound() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('rounds')
+      .select('*')
+      .eq('is_active', true)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Ошибка загрузки раунда:', error.message);
+      return null;
+    }
+
+    if (data && new Date(data.ends_at) <= new Date()) {
+      return await rotateRound(data.id);
+    }
+
+    if (data) return data;
+
+    return await createNewRound();
+  } catch (err) {
+    console.error('Сетевая ошибка при загрузке раунда:', err);
     return null;
   }
-
-  if (data && new Date(data.ends_at) <= new Date()) {
-    return await rotateRound(data.id);
-  }
-
-  if (data) return data;
-
-  return await createNewRound();
 }
 
 async function createNewRound() {
@@ -352,22 +269,31 @@ async function rotateRound(oldRoundId) {
   return await createNewRound();
 }
 
-async function loadRoundCities(roundId) {
-  const { data, error } = await supabaseClient
-    .from('cities')
-    .select('*')
-    .eq('round_id', roundId)
-    .order('created_at', { ascending: true });
+// ====== ЗАГРУЗКА ГОРОДОВ РАУНДА ======
 
-  if (error) {
-    console.error('Ошибка загрузки городов:', error.message);
+async function loadRoundCities(roundId) {
+  try {
+    const { data, error } = await supabaseClient
+      .from('cities')
+      .select('*')
+      .eq('round_id', roundId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Ошибка загрузки городов:', error.message);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Сетевая ошибка при загрузке городов:', err);
     return [];
   }
-
-  return data || [];
 }
 
-async function renderCityCard(cityRow) {
+// ====== СОЗДАНИЕ КАРТОЧКИ ГОРОДА ======
+
+function renderCityCard(cityRow) {
   const cityEl = document.createElement('div');
   cityEl.className = 'city city--no-image';
   cityEl.dataset.cityId = cityRow.id;
@@ -378,25 +304,30 @@ async function renderCityCard(cityRow) {
     <div class="city__overlay"></div>
     <div class="city__content">
       <div class="city__header">
-        <span class="city__label">${cityRow.username} назвал</span>
+        <span class="city__label">Игрок назвал</span>
+        <span class="city__player">${cityRow.username}</span>
       </div>
       <div class="city__title-row">
-        <h3 class="city__name">${buildCityNameHTML(cityRow.city_name)}</h3>
+        <h3 class="city__name">${cityRow.city_name}</h3>
       </div>
       <p class="city__meta">${metaText}</p>
     </div>
   `;
 
+  // новые города добавляются в начало списка (сверху)
   calledCitiesContainer.prepend(cityEl);
   trimVisibleCities();
 
-  const cityImage = await getCityImage(cityRow.city_name);
-  if (cityImage) {
-    cityEl.classList.remove('city--no-image');
-    cityEl.style.backgroundImage = `url("${cityImage}")`;
-  }
+  // фото подгружается в фоне, не блокируя отрисовку карточки и остальной список
+  getCityImage(cityRow.city_name).then((cityImage) => {
+    if (cityImage && cityEl.isConnected) {
+      cityEl.classList.remove('city--no-image');
+      cityEl.style.backgroundImage = `url("${cityImage}")`;
+    }
+  });
 }
 
+// убирает из DOM карточки сверх лимита (самые старые, то есть нижние в списке)
 function trimVisibleCities() {
   const cards = calledCitiesContainer.children;
   while (cards.length > VISIBLE_CITIES_LIMIT) {
@@ -404,11 +335,18 @@ function trimVisibleCities() {
   }
 }
 
+// ====== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИЗ БАЗЫ ======
+
 async function initGameState() {
-  currentRound = await getActiveRound();
+  const [round, sessionResult] = await Promise.all([
+    getActiveRound(),
+    supabaseClient.auth.getSession(),
+  ]);
+
+  currentRound = round;
 
   if (!currentRound) {
-    console.error('Не удалось получить активный раунд.');
+    showToast('Не удалось загрузить список городов. Проверьте соединение и обновите страницу.', 'error');
     return;
   }
 
@@ -417,13 +355,18 @@ async function initGameState() {
   calledCitiesContainer.innerHTML = '';
   knownCityIds = new Set();
 
+  // отрисовываем только последние VISIBLE_CITIES_LIMIT городов —
+  // более старые всё равно сразу будут обрезаны trimVisibleCities,
+  // так что не тратим на них запросы к Wikipedia
   const citiesToRender = cities.slice(-VISIBLE_CITIES_LIMIT);
 
   for (const cityRow of citiesToRender) {
     knownCityIds.add(cityRow.id);
-    await renderCityCard(cityRow);
+    renderCityCard(cityRow);
   }
 
+  // все города raunda (включая невидимые) всё равно считаются известными,
+  // чтобы поллинг не пытался их повторно отрисовать при следующей проверке
   for (const cityRow of cities) {
     knownCityIds.add(cityRow.id);
   }
@@ -436,7 +379,7 @@ async function initGameState() {
     lastCityUserId = null;
   }
 
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  const session = sessionResult.data.session;
   if (session) {
     const myCities = cities.filter((c) => c.user_id === session.user.id);
     forbiddenLettersWindow = myCities.slice(-FORBIDDEN_WINDOW_SIZE).map((c) => c.last_letter);
@@ -447,51 +390,38 @@ async function initGameState() {
   renderForbiddenLetters();
 }
 
+// ====== ПОЛЛИНГ НОВЫХ ГОРОДОВ ======
+
 async function pollForNewCities() {
   if (!currentRound) return;
-
-  // Если прошлый запрос пуллинга ещё выполняется, игнорируем новый такт таймера
-  if (isPolling) return;
 
   if (new Date(currentRound.ends_at) <= new Date()) {
     await initGameState();
     return;
   }
 
-  try {
-    isPolling = true;
+  const cities = await loadRoundCities(currentRound.id);
+  const newCities = cities.filter((c) => !knownCityIds.has(c.id));
 
-    const cities = await loadRoundCities(currentRound.id);
-    const newCities = cities.filter((c) => !knownCityIds.has(c.id));
+  if (newCities.length === 0) return;
 
-    if (newCities.length === 0) return;
+  for (const cityRow of newCities) {
+    knownCityIds.add(cityRow.id);
+    renderCityCard(cityRow);
+  }
 
-    // Шаг 1: Моментально регистрируем все новые ID городов в Set,
-    // чтобы повторные вызовы pollForNewCities не посчитали их новыми.
-    for (const cityRow of newCities) {
-      knownCityIds.add(cityRow.id);
-    }
+  lastCityLastLetter = cities[cities.length - 1].last_letter;
+  lastCityUserId = cities[cities.length - 1].user_id;
 
-    // Шаг 2: Асинхронно рендерим карточки (где внутри запрашивается Wikipedia API)
-    for (const cityRow of newCities) {
-      await renderCityCard(cityRow);
-    }
-
-    lastCityLastLetter = cities[cities.length - 1].last_letter;
-    lastCityUserId = cities[cities.length - 1].user_id;
-
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) {
-      const myCities = cities.filter((c) => c.user_id === session.user.id);
-      forbiddenLettersWindow = myCities.slice(-FORBIDDEN_WINDOW_SIZE).map((c) => c.last_letter);
-      renderForbiddenLetters();
-    }
-  } catch (err) {
-    console.error('Ошибка во время пуллинга городов:', err);
-  } finally {
-    isPolling = false;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) {
+    const myCities = cities.filter((c) => c.user_id === session.user.id);
+    forbiddenLettersWindow = myCities.slice(-FORBIDDEN_WINDOW_SIZE).map((c) => c.last_letter);
+    renderForbiddenLetters();
   }
 }
+
+// ====== ОБРАБОТЧИК ОТПРАВКИ ГОРОДА ======
 
 submitButton.addEventListener('click', async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -511,12 +441,7 @@ submitButton.addEventListener('click', async () => {
     return;
   }
 
-  if (Date.now() < penaltyEndsAt) {
-    const remaining = Math.ceil((penaltyEndsAt - Date.now()) / 1000);
-    showToast(`Вы на штрафе. Подождите ещё ${remaining} сек.`, 'error');
-    return;
-  }
-
+  // блокировка: если последний город в раунде назвал ТЕКУЩИЙ игрок — он должен ждать другого игрока
   if (lastCityUserId && lastCityUserId === session.user.id) {
     showToast('Вы уже назвали город. Дождитесь хода другого игрока.', 'error');
     return;
@@ -543,12 +468,19 @@ submitButton.addEventListener('click', async () => {
   submitButton.disabled = true;
   submitButton.textContent = 'Проверка...';
 
-  const { data: existing, error: existingError } = await supabaseClient
-    .from('cities')
-    .select('id')
-    .eq('round_id', currentRound.id)
-    .eq('normalized_name', normalizedInput)
-    .maybeSingle();
+  // запускаем проверку дубликата и поиск города ПАРАЛЛЕЛЬНО —
+  // это два независимых запроса, нет смысла ждать их по очереди
+  const [duplicateCheck, cityData] = await Promise.all([
+    supabaseClient
+      .from('cities')
+      .select('id')
+      .eq('round_id', currentRound.id)
+      .eq('normalized_name', normalizedInput)
+      .maybeSingle(),
+    checkCityExists(rawCityName),
+  ]);
+
+  const { data: existing, error: existingError } = duplicateCheck;
 
   if (existingError) {
     console.error('Ошибка проверки повтора:', existingError.message);
@@ -560,8 +492,6 @@ submitButton.addEventListener('click', async () => {
     showToast('Этот город уже был назван в текущем раунде.', 'error');
     return;
   }
-
-  const cityData = await checkCityExists(rawCityName);
 
   if (!cityData) {
     submitButton.disabled = false;
@@ -583,19 +513,14 @@ submitButton.addEventListener('click', async () => {
   if (isLetterForbidden(newLastLetter)) {
     submitButton.disabled = false;
     submitButton.textContent = 'Отправить';
-    applyPenalty();
-    const stacks = Math.round((penaltyEndsAt - Date.now()) / 60_000);
-    showToast(
-      `Штрафная буква «${newLastLetter}»! Вы не можете писать ${stacks} мин.`,
-      'error'
-    );
+    showToast(`Вы назвали город на штрафную букву "${newLastLetter}".`, 'error');
     return;
   }
 
-  const details = await getCityDetails(cityData.geonameId);
-
   const username = session.user.user_metadata?.username || session.user.email.split('@')[0];
 
+  // записываем город сразу с тем, что уже есть (без population/region из getCityDetails) —
+  // не блокируем сохранение ожиданием ещё одного запроса к GeoNames
   const { data: insertedCity, error: insertError } = await supabaseClient
     .from('cities')
     .insert({
@@ -604,8 +529,8 @@ submitButton.addEventListener('click', async () => {
       username: username,
       city_name: cityData.foundName,
       country: cityData.country,
-      region: details?.adminName1 || cityData.region || null,
-      population: details?.population || null,
+      region: cityData.region || null,
+      population: null,
       last_letter: newLastLetter,
       normalized_name: normalizedInput,
     })
@@ -627,13 +552,32 @@ submitButton.addEventListener('click', async () => {
   pushToForbiddenWindow(newLastLetter);
   renderForbiddenLetters();
 
-  await renderCityCard(insertedCity);
+  // карточка отрисовывается сразу, фото и население подгрузятся в фоне
+  renderCityCard(insertedCity);
 
   showToast(`Город «${insertedCity.city_name}» засчитан!`, 'success');
 
   cityInput.value = '';
   cityInput.focus();
+
+  // население досчитываем в фоне и тихо обновляем запись в базе (не блокируя пользователя)
+  getCityDetails(cityData.geonameId).then((details) => {
+    if (details?.population) {
+      supabaseClient
+        .from('cities')
+        .update({ population: details.population })
+        .eq('id', insertedCity.id)
+        .then(() => {
+          const metaEl = document.querySelector(`[data-city-id="${insertedCity.id}"] .city__meta`);
+          if (metaEl) {
+            metaEl.textContent = buildCityMeta(insertedCity.country, insertedCity.region, details.population);
+          }
+        });
+    }
+  });
 });
+
+// ====== СТАРТ ======
 
 initGameState();
 setInterval(pollForNewCities, POLLING_INTERVAL_MS);
