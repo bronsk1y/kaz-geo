@@ -26,8 +26,6 @@ if (citiesContainer) {
   });
 }
 
-// ====== МОДАЛЬНОЕ ОКНО ПРОСМОТРА ФОТО ======
-
 const cityModal = document.createElement('div');
 cityModal.className = 'city-modal';
 cityModal.innerHTML = `
@@ -42,7 +40,7 @@ function openCityModal(backgroundImageUrl) {
 
   cityModalImage.src = backgroundImageUrl;
   cityModal.classList.add('is-open');
-  document.body.style.overflow = 'hidden'; // блокируем скролл страницы под модалкой
+  document.body.style.overflow = 'hidden'; 
 }
 
 function closeCityModal() {
@@ -55,7 +53,6 @@ if (citiesContainer) {
     const city = event.target.closest('.city');
     if (!city) return;
 
-    // не открываем модалку для карточек без загруженного фото
     if (city.classList.contains('city--no-image')) return;
 
     const bgImage = city.style.backgroundImage; // вида: url("https://...")
