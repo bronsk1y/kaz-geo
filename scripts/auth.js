@@ -43,10 +43,6 @@ if (saveUsernameButton && dropdownUsernameInput) {
     event.stopPropagation(); // не закрывать меню кликом по кнопке сохранения
 
     const newUsername = dropdownUsernameInput.value.trim();
-    const authLink = document.querySelector('#auth-link');
-    
-    // Запоминаем старое имя на случай, если сервер вернет ошибку
-    const oldUsername = authLink ? authLink.textContent : '';
 
     if (!newUsername) {
       showToast('Имя не может быть пустым.', 'error');
@@ -58,36 +54,30 @@ if (saveUsernameButton && dropdownUsernameInput) {
       return;
     }
 
-    // === ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ UI ===
-    // Меняем имя в шапке мгновенно, до запроса к БД
-    if (authLink) {
-      authLink.textContent = newUsername;
-    }
-
-    // Даем визуальный отклик на кнопке
     saveUsernameButton.disabled = true;
-    const originalButtonText = saveUsernameButton.textContent;
-    saveUsernameButton.textContent = 'Сохраняем...'; 
 
-    // Отправляем запрос на сервер
-    const { data, error } = await supabaseClient.auth.updateUser({
-      data: { username: newUsername },
-    });
+    try {
+      const { data, error } = await supabaseClient.auth.updateUser({
+        data: { username: newUsername },
+      });
 
-    // Возвращаем кнопку в исходное состояние
-    saveUsernameButton.disabled = false;
-    saveUsernameButton.textContent = originalButtonText;
+      saveUsernameButton.disabled = false;
 
-    if (error) {
-      // Если произошла ошибка сети или базы данных — откатываем имя обратно
-      if (authLink) {
-        authLink.textContent = oldUsername;
+      if (error) {
+        showToast('Не удалось сохранить имя: ' + error.message, 'error');
+        return;
       }
-      showToast('Не удалось сохранить имя: ' + error.message, 'error');
-      return;
-    }
 
-    showToast('Имя успешно обновлено!', 'success');
+      // обновляем отображаемое имя в кнопке хедера
+      const authLink = document.querySelector('#auth-link');
+      if (authLink) authLink.textContent = newUsername;
+
+      showToast('Имя успешно обновлено!', 'success');
+    } catch (err) {
+      saveUsernameButton.disabled = false;
+      console.error('Непойманная ошибка смены имени:', err);
+      showToast('Не удалось сохранить имя. Проверьте соединение и попробуйте снова.', 'error');
+    }
   });
 
   // не закрывать выпадающее меню при клике/вводе текста в само поле
