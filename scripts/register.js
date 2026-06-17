@@ -1,18 +1,12 @@
-// ====== ВАЛИДАЦИЯ EMAIL ======
-
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(email) {
   return EMAIL_REGEX.test(email);
 }
 
-// ====== DOM ЭЛЕМЕНТЫ ======
-
 const registerButton = document.querySelector('#register-button');
 const emailInput = document.querySelector('#email-field');
 const passwordInput = document.querySelector('#password-field');
-
-// ====== ОБРАБОТЧИК РЕГИСТРАЦИИ ======
 
 registerButton.addEventListener('click', async () => {
   const rawEmail = emailInput.value.trim();
@@ -35,8 +29,6 @@ registerButton.addEventListener('click', async () => {
 
   const cleanEmail = rawEmail.toLowerCase();
 
-  // временное имя для отображения — локальная часть email до @;
-  // позже пользователь сможет сменить его в настройках профиля
   const defaultUsername = cleanEmail.split('@')[0];
 
   registerButton.disabled = true;
