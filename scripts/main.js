@@ -1,40 +1,29 @@
-// ====== НАСТРОЙКИ ======
-const GEONAMES_USERNAME = 'Wujab'; 
+const GEONAMES_USERNAME = 'Wujab';  // Не забыть сменить API на OSM
 const POLLING_INTERVAL_MS = 20000; 
 
-// ====== DOM ЭЛЕМЕНТЫ ======
 const cityInput = document.querySelector('#city-name');
 const submitButton = document.querySelector('#submit-button');
 const calledCitiesContainer = document.querySelector('#called-cities-container');
 const forbiddenLettersEl = document.querySelector('.forbidden-letters');
 
-// ====== СОСТОЯНИЕ ИГРЫ (синхронизируется с базой) ======
 let currentRound = null; // { id, started_at, ends_at }
 let lastCityLastLetter = null; // буква, на которую должен начинаться следующий город (из ОБЩЕГО списка)
 let lastCityUserId = null; // user_id автора последнего названного города (для блокировки повторной отправки)
 let knownCityIds = new Set(); // id городов, уже отрисованных на странице (чтобы не дублировать при поллинге)
 
-// личное окно последних 5 букв ТЕКУЩЕГО игрока в рамках раунда
 const FORBIDDEN_WINDOW_SIZE = 5;
 let forbiddenLettersWindow = [];
 
-// сколько карточек городов одновременно показывать на странице (визуальное окно,
-// правила игры всё равно учитывают полную историю раунда из базы)
 const VISIBLE_CITIES_LIMIT = 15;
 
-// буквы, на которых игра не обрывается, а смещается на букву раньше
 const EXCLUDED_LETTERS = ['Ы', 'Ь', 'Ъ'];
 
-// альтернативные пары: если предыдущий город кончается на ключ,
-// следующий может начинаться на любую из букв в значении
 const ALTERNATIVE_LETTERS = {
   'Й': ['Й', 'И'],
   'И': ['И', 'Й'],
   'Ё': ['Ё', 'Е'],
   'Е': ['Е', 'Ё'],
 };
-
-// ====== УТИЛИТЫ ПРАВИЛ ИГРЫ ======
 
 function normalizeForCompare(str) {
   return str
@@ -58,8 +47,6 @@ function getEffectiveLastLetter(word) {
 function getAllowedStartLetters(lastLetter) {
   return ALTERNATIVE_LETTERS[lastLetter] || [lastLetter];
 }
-
-// ====== ШТРАФНЫЕ БУКВЫ (личные для игрока) ======
 
 function isLetterForbidden(letter) {
   return forbiddenLettersWindow.includes(letter);
@@ -85,10 +72,6 @@ function renderForbiddenLetters() {
     .join('');
 }
 
-// ====== УТИЛИТА: FETCH С ТАЙМАУТОМ ======
-// Без таймаута на мобильной сети одно подвисшее соединение могло
-// бесконечно "висеть", из-за чего весь процесс выглядел зависшим.
-
 async function fetchWithTimeout(url, timeoutMs = 8000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -100,8 +83,6 @@ async function fetchWithTimeout(url, timeoutMs = 8000) {
     clearTimeout(timeoutId);
   }
 }
-
-// ====== GEONAMES: ПОИСК И ПРОВЕРКА ГОРОДА ======
 
 async function checkCityExists(cityName) {
   try {
@@ -166,8 +147,6 @@ async function getCityDetails(geonameId) {
   }
 }
 
-// ====== WIKIPEDIA: ТОЛЬКО ФОТО ======
-
 async function getCityImage(cityName) {
   try {
     const response = await fetch(
@@ -194,8 +173,6 @@ async function getCityImage(cityName) {
   }
 }
 
-// ====== СБОРКА ТЕКСТА МЕТАДАННЫХ ======
-
 function buildCityMeta(country, region, population) {
   const parts = [];
 
@@ -211,8 +188,6 @@ function buildCityMeta(country, region, population) {
 
   return parts.join(', ');
 }
-
-// ====== РАУНДЫ ======
 
 async function getActiveRound() {
   try {
@@ -269,8 +244,6 @@ async function rotateRound(oldRoundId) {
   return await createNewRound();
 }
 
-// ====== ЗАГРУЗКА ГОРОДОВ РАУНДА ======
-
 async function loadRoundCities(roundId) {
   try {
     const { data, error } = await supabaseClient
@@ -290,8 +263,6 @@ async function loadRoundCities(roundId) {
     return [];
   }
 }
-
-// ====== СОЗДАНИЕ КАРТОЧКИ ГОРОДА ======
 
 function renderCityCard(cityRow) {
   const cityEl = document.createElement('div');
@@ -313,11 +284,9 @@ function renderCityCard(cityRow) {
     </div>
   `;
 
-  // новые города добавляются в начало списка (сверху)
   calledCitiesContainer.prepend(cityEl);
   trimVisibleCities();
 
-  // фото подгружается в фоне, не блокируя отрисовку карточки и остальной список
   getCityImage(cityRow.city_name).then((cityImage) => {
     if (cityImage && cityEl.isConnected) {
       cityEl.classList.remove('city--no-image');
@@ -326,15 +295,12 @@ function renderCityCard(cityRow) {
   });
 }
 
-// убирает из DOM карточки сверх лимита (самые старые, то есть нижние в списке)
 function trimVisibleCities() {
   const cards = calledCitiesContainer.children;
   while (cards.length > VISIBLE_CITIES_LIMIT) {
     calledCitiesContainer.removeChild(cards[cards.length - 1]);
   }
 }
-
-// ====== ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ИЗ БАЗЫ ======
 
 async function initGameState() {
   const [round, sessionResult] = await Promise.all([
@@ -354,9 +320,6 @@ async function initGameState() {
   calledCitiesContainer.innerHTML = '';
   knownCityIds = new Set();
 
-  // отрисовываем только последние VISIBLE_CITIES_LIMIT городов —
-  // более старые всё равно сразу будут обрезаны trimVisibleCities,
-  // так что не тратим на них запросы к Wikipedia
   const citiesToRender = cities.slice(-VISIBLE_CITIES_LIMIT);
 
   for (const cityRow of citiesToRender) {
@@ -364,8 +327,6 @@ async function initGameState() {
     renderCityCard(cityRow);
   }
 
-  // все города raunda (включая невидимые) всё равно считаются известными,
-  // чтобы поллинг не пытался их повторно отрисовать при следующей проверке
   for (const cityRow of cities) {
     knownCityIds.add(cityRow.id);
   }
@@ -388,8 +349,6 @@ async function initGameState() {
 
   renderForbiddenLetters();
 }
-
-// ====== ПОЛЛИНГ НОВЫХ ГОРОДОВ ======
 
 async function pollForNewCities() {
   if (!currentRound) return;
@@ -420,8 +379,6 @@ async function pollForNewCities() {
   }
 }
 
-// ====== ОБРАБОТЧИК ОТПРАВКИ ГОРОДА ======
-
 submitButton.addEventListener('click', async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
@@ -440,7 +397,6 @@ submitButton.addEventListener('click', async () => {
     return;
   }
 
-  // блокировка: если последний город в раунде назвал ТЕКУЩИЙ игрок — он должен ждать другого игрока
   if (lastCityUserId && lastCityUserId === session.user.id) {
     showToast('Вы уже назвали город. Дождитесь хода другого игрока.', 'error');
     return;
@@ -467,8 +423,6 @@ submitButton.addEventListener('click', async () => {
   submitButton.disabled = true;
   submitButton.textContent = 'Проверка...';
 
-  // запускаем проверку дубликата и поиск города ПАРАЛЛЕЛЬНО —
-  // это два независимых запроса, нет смысла ждать их по очереди
   const [duplicateCheck, cityData] = await Promise.all([
     supabaseClient
       .from('cities')
@@ -518,8 +472,6 @@ submitButton.addEventListener('click', async () => {
 
   const username = session.user.user_metadata?.username || session.user.email.split('@')[0];
 
-  // записываем город сразу с тем, что уже есть (без population/region из getCityDetails) —
-  // не блокируем сохранение ожиданием ещё одного запроса к GeoNames
   const { data: insertedCity, error: insertError } = await supabaseClient
     .from('cities')
     .insert({
@@ -551,7 +503,6 @@ submitButton.addEventListener('click', async () => {
   pushToForbiddenWindow(newLastLetter);
   renderForbiddenLetters();
 
-  // карточка отрисовывается сразу, фото и население подгрузятся в фоне
   renderCityCard(insertedCity);
 
   showToast(`Город «${insertedCity.city_name}» засчитан!`, 'success');
@@ -559,7 +510,6 @@ submitButton.addEventListener('click', async () => {
   cityInput.value = '';
   cityInput.focus();
 
-  // население досчитываем в фоне и тихо обновляем запись в базе (не блокируя пользователя)
   getCityDetails(cityData.geonameId).then((details) => {
     if (details?.population) {
       supabaseClient
@@ -575,8 +525,6 @@ submitButton.addEventListener('click', async () => {
     }
   });
 });
-
-// ====== СТАРТ ======
 
 initGameState();
 setInterval(pollForNewCities, POLLING_INTERVAL_MS);
