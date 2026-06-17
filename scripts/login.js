@@ -35,22 +35,31 @@ loginButton.addEventListener('click', async (event) => {
   loginButton.disabled = true;
   loginButton.textContent = 'Вход...';
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: cleanEmail,
-    password: password,
-  });
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: cleanEmail,
+      password: password,
+    });
 
-  loginButton.disabled = false;
-  loginButton.textContent = 'Войти';
+    loginButton.disabled = false;
+    loginButton.textContent = 'Войти';
 
-  if (error) {
-    showToast('Ошибка входа: ' + error.message, 'error');
-    return;
+    if (error) {
+      showToast('Ошибка входа: ' + error.message, 'error');
+      return;
+    }
+
+    showToast('Вход выполнен успешно!', 'success');
+
+    setTimeout(() => {
+      window.location.href = '../index.html';
+    }, 1000);
+  } catch (err) {
+    // непойманная ошибка (сеть пропала, запрос прервался и т.д.) —
+    // без этого блока кнопка молча "зависала" бы на тексте "Вход..." навсегда
+    loginButton.disabled = false;
+    loginButton.textContent = 'Войти';
+    console.error('Непойманная ошибка входа:', err);
+    showToast('Не удалось выполнить вход. Проверьте соединение и попробуйте снова.', 'error');
   }
-
-  showToast('Вход выполнен успешно!', 'success');
-
-  setTimeout(() => {
-    window.location.href = '../index.html';
-  }, 1000);
 });
