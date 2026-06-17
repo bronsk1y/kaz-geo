@@ -6,10 +6,10 @@ const submitButton = document.querySelector('#submit-button');
 const calledCitiesContainer = document.querySelector('#called-cities-container');
 const forbiddenLettersEl = document.querySelector('.forbidden-letters');
 
-let currentRound = null; // { id, started_at, ends_at }
-let lastCityLastLetter = null; // буква, на которую должен начинаться следующий город (из ОБЩЕГО списка)
-let lastCityUserId = null; // user_id автора последнего названного города (для блокировки повторной отправки)
-let knownCityIds = new Set(); // id городов, уже отрисованных на странице (чтобы не дублировать при поллинге)
+let currentRound = null; 
+let lastCityLastLetter = null; 
+let lastCityUserId = null; 
+let knownCityIds = new Set();
 
 const FORBIDDEN_WINDOW_SIZE = 5;
 let forbiddenLettersWindow = [];
