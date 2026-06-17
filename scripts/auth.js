@@ -33,8 +33,6 @@ async function checkAuth() {
   }
 }
 
-// ====== ИЗМЕНЕНИЕ ИМЕНИ ПОЛЬЗОВАТЕЛЯ ======
-
 const saveUsernameButton = document.querySelector('#save-username-button');
 const dropdownUsernameInput = document.querySelector('#dropdown-username');
 
@@ -68,7 +66,6 @@ if (saveUsernameButton && dropdownUsernameInput) {
         return;
       }
 
-      // обновляем отображаемое имя в кнопке хедера
       const authLink = document.querySelector('#auth-link');
       if (authLink) authLink.textContent = newUsername;
 
@@ -80,7 +77,6 @@ if (saveUsernameButton && dropdownUsernameInput) {
     }
   });
 
-  // не закрывать выпадающее меню при клике/вводе текста в само поле
   dropdownUsernameInput.addEventListener('click', (event) => {
     event.stopPropagation();
   });
