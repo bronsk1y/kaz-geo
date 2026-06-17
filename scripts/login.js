@@ -1,18 +1,12 @@
-// ====== ВАЛИДАЦИЯ EMAIL ======
-
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(email) {
   return EMAIL_REGEX.test(email);
 }
 
-// ====== DOM ЭЛЕМЕНТЫ ======
-
 const loginButton = document.querySelector('#login-button');
 const emailInput = document.querySelector('#email-field');
 const passwordInput = document.querySelector('#password-field');
-
-// ====== ОБРАБОТЧИК ВХОДА ======
 
 loginButton.addEventListener('click', async (event) => {
   event.preventDefault();
@@ -55,8 +49,6 @@ loginButton.addEventListener('click', async (event) => {
       window.location.href = '../index.html';
     }, 1000);
   } catch (err) {
-    // непойманная ошибка (сеть пропала, запрос прервался и т.д.) —
-    // без этого блока кнопка молча "зависала" бы на тексте "Вход..." навсегда
     loginButton.disabled = false;
     loginButton.textContent = 'Войти';
     console.error('Непойманная ошибка входа:', err);
