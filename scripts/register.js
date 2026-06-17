@@ -42,27 +42,34 @@ registerButton.addEventListener('click', async () => {
   registerButton.disabled = true;
   registerButton.textContent = 'Регистрация...';
 
-  const { data, error } = await supabaseClient.auth.signUp({
-    email: cleanEmail,
-    password: password,
-    options: {
-      data: {
-        username: defaultUsername,
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email: cleanEmail,
+      password: password,
+      options: {
+        data: {
+          username: defaultUsername,
+        },
       },
-    },
-  });
+    });
 
-  registerButton.disabled = false;
-  registerButton.textContent = 'Зарегистрироваться';
+    registerButton.disabled = false;
+    registerButton.textContent = 'Зарегистрироваться';
 
-  if (error) {
-    showToast('Ошибка регистрации: ' + error.message, 'error');
-    return;
+    if (error) {
+      showToast('Ошибка регистрации: ' + error.message, 'error');
+      return;
+    }
+
+    showToast('Регистрация прошла успешно!', 'success');
+
+    setTimeout(() => {
+      window.location.href = '../index.html';
+    }, 1200);
+  } catch (err) {
+    registerButton.disabled = false;
+    registerButton.textContent = 'Зарегистрироваться';
+    console.error('Непойманная ошибка регистрации:', err);
+    showToast('Не удалось зарегистрироваться. Проверьте соединение и попробуйте снова.', 'error');
   }
-
-  showToast('Регистрация прошла успешно!', 'success');
-
-  setTimeout(() => {
-    window.location.href = '../index.html';
-  }, 1200);
 });
