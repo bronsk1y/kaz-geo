@@ -1,14 +1,13 @@
-const GEONAMES_USERNAME = 'Wujab';  // Не забыть сменить API на OSM
-const POLLING_INTERVAL_MS = 20000; 
+const POLLING_INTERVAL_MS = 20000;
 
 const cityInput = document.querySelector('#city-name');
 const submitButton = document.querySelector('#submit-button');
 const calledCitiesContainer = document.querySelector('#called-cities-container');
 const forbiddenLettersEl = document.querySelector('.forbidden-letters');
 
-let currentRound = null; 
-let lastCityLastLetter = null; 
-let lastCityUserId = null; 
+let currentRound = null;
+let lastCityLastLetter = null;
+let lastCityUserId = null;
 let knownCityIds = new Set();
 
 const FORBIDDEN_WINDOW_SIZE = 5;
@@ -72,77 +71,84 @@ function renderForbiddenLetters() {
     .join('');
 }
 
-async function fetchWithTimeout(url, timeoutMs = 8000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+async function checkCityExists(cityName) {
+  const normalized = normalizeForCompare(cityName);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
+    const { data, error } = await supabaseClient
+      .from('ru_cities')
+      .select('*')
+      .eq('normalized_name', normalized)
+      .limit(5);
+
+    if (error) {
+      console.error('Ошибка проверки города:', error.message);
+    }
+
+    if (data && data.length > 0) {
+      const best = data[0];
+
+      return {
+        foundName: best.name,
+        country: 'Россия',
+        region: best.region_name || null,
+        population: null,
+      };
+    }
+  } catch (err) {
+    console.error('Сетевая ошибка при проверке города в ru_cities:', err);
   }
+
+  // город не найден в строгом российском реестре — пробуем Nominatim
+  // как резервный источник (покрывает зарубежные и редкие города)
+  return await checkCityViaNominatim(cityName);
 }
 
-async function checkCityExists(cityName) {
+async function checkCityViaNominatim(cityName) {
   try {
-    const response = await fetchWithTimeout(
-      `https://secure.geonames.org/searchJSON?name_equals=${encodeURIComponent(
-        cityName
-      )}&featureClass=P&maxRows=5&lang=ru&username=${GEONAMES_USERNAME}`
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=5&accept-language=ru&addressdetails=1`
     );
 
     if (!response.ok) return null;
 
-    const data = await response.json();
+    const results = await response.json();
+    if (!results || results.length === 0) return null;
 
-    if (data.status) {
-      console.error('Ошибка GeoNames:', data.status.message);
-      return null;
-    }
-
-    const results = data.geonames || [];
-    if (results.length === 0) return null;
-
-    const priorityOrder = ['PPLC', 'PPLA', 'PPLA2', 'PPLA3', 'PPLA4', 'PPL', 'PPLX'];
-    const sorted = [...results].sort(
-      (a, b) => priorityOrder.indexOf(a.fcode) - priorityOrder.indexOf(b.fcode)
+    const validTypes = ['city', 'town', 'village', 'hamlet', 'administrative'];
+    const best = results.find(
+      (r) => validTypes.includes(r.type) || validTypes.includes(r.addresstype)
     );
-    const best = sorted[0];
+
+    if (!best) return null;
 
     return {
-      foundName: best.name,
-      country: best.countryName,
-      region: best.adminName1 || null,
-      geonameId: best.geonameId,
+      foundName: best.display_name.split(',')[0],
+      country: best.address?.country || best.display_name.split(',').pop().trim(),
+      region: best.address?.state || best.address?.region || null,
+      population: null,
     };
   } catch (err) {
-    console.error('Ошибка проверки города:', err);
+    console.error('Сетевая ошибка при проверке города в Nominatim:', err);
     return null;
   }
 }
 
-async function getCityDetails(geonameId) {
+async function fetchPopulationFromNominatim(cityName) {
   try {
-    const response = await fetchWithTimeout(
-      `https://secure.geonames.org/getJSON?geonameId=${geonameId}&lang=ru&username=${GEONAMES_USERNAME}`
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1&extratags=1&accept-language=ru`
     );
 
     if (!response.ok) return null;
 
-    const data = await response.json();
+    const results = await response.json();
+    if (!results || results.length === 0) return null;
 
-    if (data.status) {
-      console.error('Ошибка GeoNames:', data.status.message);
-      return null;
-    }
-
-    return {
-      population: data.population || null,
-      adminName1: data.adminName1 || null,
-    };
+    const population = results[0]?.extratags?.population;
+    return population ? parseInt(population, 10) : null;
   } catch (err) {
-    console.error('Ошибка загрузки деталей города:', err);
+    console.error('Ошибка загрузки населения:', err);
     return null;
   }
 }
@@ -379,6 +385,12 @@ async function pollForNewCities() {
   }
 }
 
+function resetSubmitButton(button, originalText) {
+  button.disabled = false;
+  button.classList.remove('is-loading');
+  button.textContent = originalText;
+}
+
 submitButton.addEventListener('click', async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
@@ -421,81 +433,89 @@ submitButton.addEventListener('click', async () => {
   const normalizedInput = normalizeForCompare(rawCityName);
 
   submitButton.disabled = true;
-  submitButton.textContent = 'Проверка...';
+  submitButton.classList.add('is-loading');
+  const originalButtonText = submitButton.textContent;
+  submitButton.innerHTML = '<span class="button-spinner"></span>';
 
-  const [duplicateCheck, cityData] = await Promise.all([
-    supabaseClient
-      .from('cities')
-      .select('id')
-      .eq('round_id', currentRound.id)
-      .eq('normalized_name', normalizedInput)
-      .maybeSingle(),
-    checkCityExists(rawCityName),
-  ]);
-
-  const { data: existing, error: existingError } = duplicateCheck;
-
-  if (existingError) {
-    console.error('Ошибка проверки повтора:', existingError.message);
-  }
-
-  if (existing) {
-    submitButton.disabled = false;
-    submitButton.textContent = 'Отправить';
-    showToast('Этот город уже был назван в текущем раунде.', 'error');
-    return;
-  }
+  const cityData = await checkCityExists(rawCityName);
 
   if (!cityData) {
-    submitButton.disabled = false;
-    submitButton.textContent = 'Отправить';
+    resetSubmitButton(submitButton, originalButtonText);
     showToast('Такого населённого пункта не существует. Попробуйте другой.', 'error');
     return;
   }
 
   const normalizedFound = normalizeForCompare(cityData.foundName);
   if (normalizedFound !== normalizedInput) {
-    submitButton.disabled = false;
-    submitButton.textContent = 'Отправить';
+    resetSubmitButton(submitButton, originalButtonText);
     showToast(`Не удалось точно подтвердить населённый пункт "${rawCityName}". Проверьте название.`, 'error');
     return;
   }
 
   const newLastLetter = getEffectiveLastLetter(cityData.foundName);
+  const username = session.user.user_metadata?.username || session.user.email.split('@')[0];
 
-  if (isLetterForbidden(newLastLetter)) {
-    submitButton.disabled = false;
-    submitButton.textContent = 'Отправить';
+  const allowedStartLetters = lastCityLastLetter
+    ? getAllowedStartLetters(lastCityLastLetter)
+    : null;
+
+  const { data: rpcResult, error: rpcError } = await supabaseClient.rpc('submit_city', {
+    p_round_id: currentRound.id,
+    p_user_id: session.user.id,
+    p_username: username,
+    p_city_name: cityData.foundName,
+    p_country: cityData.country,
+    p_region: cityData.region || null,
+    p_population: null,
+    p_last_letter: newLastLetter,
+    p_normalized_name: normalizedInput,
+    p_allowed_start_letters: allowedStartLetters,
+  });
+
+  resetSubmitButton(submitButton, originalButtonText);
+
+  if (rpcError) {
+    console.error('Ошибка отправки города:', rpcError.message);
+    showToast('Не удалось сохранить город. Попробуйте ещё раз.', 'error');
+    return;
+  }
+
+  const { result_status, inserted_city } = rpcResult[0];
+
+  if (result_status === 'duplicate') {
+    showToast('Этот город уже был назван в текущем раунде.', 'error');
+    return;
+  }
+
+  if (result_status === 'wrong_letter') {
+    showToast(`Город должен начинаться на правильную букву — кто-то опередил вас с ходом.`, 'error');
+    await pollForNewCities();
+    return;
+  }
+
+  if (result_status === 'not_your_turn') {
+    showToast('Сейчас не ваша очередь — кто-то уже сходил перед вами.', 'error');
+    await pollForNewCities();
+    return;
+  }
+
+  if (result_status === 'forbidden_letter') {
     showToast(`Вы назвали город на штрафную букву "${newLastLetter}".`, 'error');
     return;
   }
 
-  const username = session.user.user_metadata?.username || session.user.email.split('@')[0];
+  if (result_status === 'round_expired') {
+    await initGameState();
+    showToast('Раунд завершён, начался новый! Список городов обновлён.', 'info');
+    return;
+  }
 
-  const { data: insertedCity, error: insertError } = await supabaseClient
-    .from('cities')
-    .insert({
-      round_id: currentRound.id,
-      user_id: session.user.id,
-      username: username,
-      city_name: cityData.foundName,
-      country: cityData.country,
-      region: cityData.region || null,
-      population: null,
-      last_letter: newLastLetter,
-      normalized_name: normalizedInput,
-    })
-    .select()
-    .single();
-
-  submitButton.disabled = false;
-  submitButton.textContent = 'Отправить';
-
-  if (insertError) {
-    console.error('Ошибка сохранения города:', insertError.message);
+  if (result_status !== 'success' || !inserted_city) {
     showToast('Не удалось сохранить город. Попробуйте ещё раз.', 'error');
     return;
   }
+
+  const insertedCity = inserted_city;
 
   knownCityIds.add(insertedCity.id);
   lastCityLastLetter = newLastLetter;
@@ -510,19 +530,22 @@ submitButton.addEventListener('click', async () => {
   cityInput.value = '';
   cityInput.focus();
 
-  getCityDetails(cityData.geonameId).then((details) => {
-    if (details?.population) {
-      supabaseClient
-        .from('cities')
-        .update({ population: details.population })
-        .eq('id', insertedCity.id)
-        .then(() => {
-          const metaEl = document.querySelector(`[data-city-id="${insertedCity.id}"] .city__meta`);
+  fetchPopulationFromNominatim(insertedCity.city_name).then((population) => {
+    if (!population) return;
+
+    supabaseClient
+      .from('cities')
+      .update({ population })
+      .eq('id', insertedCity.id)
+      .then(() => {
+        const cityEl = calledCitiesContainer.querySelector(`[data-city-id="${insertedCity.id}"]`);
+        if (cityEl) {
+          const metaEl = cityEl.querySelector('.city__meta');
           if (metaEl) {
-            metaEl.textContent = buildCityMeta(insertedCity.country, insertedCity.region, details.population);
+            metaEl.textContent = buildCityMeta(insertedCity.country, insertedCity.region, population);
           }
-        });
-    }
+        }
+      });
   });
 });
 
