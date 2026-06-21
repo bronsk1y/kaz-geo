@@ -281,8 +281,7 @@ function renderCityCard(cityRow) {
     <div class="city__overlay"></div>
     <div class="city__content">
       <div class="city__header">
-        <span class="city__label">Игрок назвал</span>
-        <span class="city__player">${cityRow.username}</span>
+        <span class="city__label">${cityRow.username} назвал</span>
       </div>
       <div class="city__title-row">
         <h3 class="city__name">${cityRow.city_name}</h3>
