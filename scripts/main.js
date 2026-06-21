@@ -281,7 +281,8 @@ function renderCityCard(cityRow) {
     <div class="city__overlay"></div>
     <div class="city__content">
       <div class="city__header">
-        <span class="city__label">${cityRow.username} назвал</span>
+        <span class="city__label">Игрок назвал</span>
+        <span class="city__player">${cityRow.username}</span>
       </div>
       <div class="city__title-row">
         <h3 class="city__name">${cityRow.city_name}</h3>
@@ -359,8 +360,17 @@ async function initGameState() {
 async function pollForNewCities() {
   if (!currentRound) return;
 
-  if (new Date(currentRound.ends_at) <= new Date()) {
+  // всегда проверяем актуальное состояние раунда из базы,
+  // а не доверяем currentRound в памяти — он мог устареть
+  // если страница открыта дольше 3 дней без перезагрузки
+  const freshRound = await getActiveRound();
+
+  if (!freshRound) return;
+
+  // если раунд сменился — полностью переинициализируем состояние
+  if (freshRound.id !== currentRound.id) {
     await initGameState();
+    showToast('Начался новый раунд! Список городов обновлён.', 'info');
     return;
   }
 
@@ -472,10 +482,21 @@ submitButton.addEventListener('click', async () => {
     p_allowed_start_letters: allowedStartLetters,
   });
 
+  console.log('DEBUG submit_city params:', {
+    p_round_id: currentRound.id,
+    p_user_id: session.user.id,
+    p_city_name: cityData.foundName,
+    p_last_letter: newLastLetter,
+    p_normalized_name: normalizedInput,
+    p_allowed_start_letters: allowedStartLetters,
+  });
+  console.log('DEBUG rpcError:', rpcError);
+  console.log('DEBUG rpcResult:', rpcResult);
+
   resetSubmitButton(submitButton, originalButtonText);
 
   if (rpcError) {
-    console.error('Ошибка отправки города:', rpcError.message);
+    console.error('Ошибка отправки города:', rpcError.message, rpcError);
     showToast('Не удалось сохранить город. Попробуйте ещё раз.', 'error');
     return;
   }
